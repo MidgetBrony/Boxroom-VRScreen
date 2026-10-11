@@ -17,7 +17,7 @@ using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.UI;
 
-[assembly: MelonInfo(typeof(Boxroom_VRScreen.Core), "Boxroom-VRScreen", "0.3.34", "MidgetBrony")]
+[assembly: MelonInfo(typeof(Boxroom_VRScreen.Core), "Boxroom-VRScreen", "0.3.35", "MidgetBrony")]
 [assembly: MelonGame("NestedLoop", "BOXROOM")]
 [assembly: MelonAdditionalDependencies("Boxroom_TV")]
 
@@ -49,6 +49,7 @@ public sealed class Core : MelonMod
     private Vector2 pointerPosition = new(0.5f, 0.5f);
     private int lastPointerDeltaSequence;
     private Vector2 lastPointerDeltaTotal;
+    private Process hostProcess;
 
     private sealed class ReticleState
     {
@@ -70,6 +71,7 @@ public sealed class Core : MelonMod
         Application.runInBackground = true;
         dataRoot = Path.Combine(Directory.GetParent(Application.dataPath).FullName, "UserData", "Boxroom-VRScreen");
         Directory.CreateDirectory(dataRoot);
+        try { File.Delete(Path.Combine(dataRoot, "launch.request")); } catch { }
         StartHost();
         try
         {
@@ -521,8 +523,26 @@ public sealed class Core : MelonMod
         if (!File.Exists(exe)) { LoggerInstance.Warning("Window helper missing: " + exe); return; }
         try
         {
-            if (Process.GetProcessesByName("Boxroom.VRScreen.Host").Length == 0)
-                Process.Start(new ProcessStartInfo(exe) { UseShellExecute = true, WorkingDirectory = dataRoot });
+            foreach (Process existing in Process.GetProcessesByName("Boxroom.VRScreen.Host"))
+            {
+                try
+                {
+                    if (!string.Equals(existing.MainModule?.FileName, exe, StringComparison.OrdinalIgnoreCase)) continue;
+                    existing.Kill();
+                    existing.WaitForExit(1000);
+                }
+                catch { }
+                finally { existing.Dispose(); }
+            }
+
+            Process current = Process.GetCurrentProcess();
+            hostProcess = Process.Start(new ProcessStartInfo(exe)
+            {
+                Arguments = "--boxroom-pid " + current.Id,
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                WorkingDirectory = dataRoot
+            });
         }
         catch (Exception exception) { LoggerInstance.Error("Could not start window helper: " + exception.Message); }
     }
@@ -531,8 +551,17 @@ public sealed class Core : MelonMod
     {
         RestorePointer();
         UnlockBoxroomInput();
-        view?.Dispose(); map?.Dispose();
+        try { if (nativeStarted) VRScreen_StopCapture(); } catch { }
         if (externalTexture != null) UnityEngine.Object.Destroy(externalTexture);
         ReleaseDisplay();
+        EnsureMap();
+        try { view?.Write(12, Protocol.ShutdownRequested); } catch { }
+        try
+        {
+            if (hostProcess != null && !hostProcess.WaitForExit(1500)) hostProcess.Kill();
+        }
+        catch { }
+        finally { hostProcess?.Dispose(); hostProcess = null; }
+        view?.Dispose(); map?.Dispose();
     }
 }

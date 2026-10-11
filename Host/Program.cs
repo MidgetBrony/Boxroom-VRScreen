@@ -14,10 +14,13 @@ namespace Boxroom.VRScreen.Host;
 
 internal static class Program
 {
-    [STAThread] private static void Main()
+    [STAThread] private static void Main(string[] args)
     {
+        int ownerProcessId = 0;
+        if (args.Length >= 2 && args[0].Equals("--boxroom-pid", StringComparison.OrdinalIgnoreCase))
+            int.TryParse(args[1], out ownerProcessId);
         Application.EnableVisualStyles();
-        using (var context = new CaptureContext()) Application.Run(context);
+        using (var context = new CaptureContext(ownerProcessId)) Application.Run(context);
     }
 }
 
@@ -43,6 +46,7 @@ internal sealed class CaptureContext : ApplicationContext
     private readonly MemoryMappedViewAccessor view;
     private readonly System.Windows.Forms.Timer timer;
     private readonly HotkeyWindow hotkey;
+    private readonly int ownerProcessId;
     private IntPtr boxroomWindow, gameWindow;
     private int boxroomProcessId;
     private IntPtr originalGameStyle, originalBoxroomExStyle;
@@ -65,18 +69,36 @@ internal sealed class CaptureContext : ApplicationContext
     private byte[] pixelBuffer;
     private int bufferSourceWidth, bufferSourceHeight, bufferWidth, bufferHeight;
 
-    internal CaptureContext()
+    internal CaptureContext(int ownerProcessId)
     {
+        this.ownerProcessId = ownerProcessId;
         view = map.CreateViewAccessor(0, Capacity);
         hotkey = new HotkeyWindow(ToggleTvMode);
         timer = new System.Windows.Forms.Timer { Interval = 8 };
         timer.Tick += (_, __) => Tick();
         timer.Start();
+        if (ownerProcessId > 0) Log("Helper attached to BOXROOM process PID " + ownerProcessId + ".");
     }
 
     private void Tick()
     {
         ReadRequest();
+        int state = view.ReadInt32(12);
+        if (state == 7)
+        {
+            Log("BOXROOM requested helper shutdown.");
+            EndHostedSession(true);
+            view.Write(12, 0);
+            ExitThread();
+            return;
+        }
+        if (ownerProcessId > 0 && !IsProcessAlive(ownerProcessId))
+        {
+            Log("The owning BOXROOM process closed; restoring the staged game window and stopping the helper.");
+            EndHostedSession(true);
+            ExitThread();
+            return;
+        }
         RefreshBoxroomWindow();
         bool boxroomAlive = boxroomProcessId > 0
             ? IsProcessAlive(boxroomProcessId)
@@ -112,7 +134,6 @@ internal sealed class CaptureContext : ApplicationContext
             return;
         }
 
-        int state = view.ReadInt32(12);
         if (!tvModeActive && state == 1) FindGame();
         else if (!tvModeActive && state == 5) ResumeGameInput();
         else if (tvModeActive && state == 6) ReturnToRoom();
