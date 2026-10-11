@@ -1,0 +1,8 @@
+bin/
+obj/
+dist/
+Directory.Build.user.props
+*.user
+*.pdb
+Baselines/
+.vs/

@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "id": "boxroom-vrscreen",
+  "name": "Boxroom-VRScreen",
+  "author": "MidgetBrony",
+  "description": "Experimental Windows-only game-window capture and input for BOXROOM televisions.",
+  "repository": "https://github.com/MidgetBrony/Boxroom-VRScreen",
+  "experimental": true,
+  "requirements": { "melonLoader": "0.7.0" },
+  "dependencies": [
+    {
+      "manifest": "https://raw.githubusercontent.com/MidgetBrony/Boxroom-TV/refs/heads/main/manifest.json",
+      "minimumVersion": "4.0.2-beta.1",
+      "required": true
+    }
+  ],
+  "release": {
+    "provider": "github",
+    "asset": "Boxroom-VRScreen-*.zip",
+    "checksumAsset": "SHA256SUMS.txt"
+  }
+}

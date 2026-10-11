@@ -1,0 +1,45 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <AssemblyName>Boxroom_VRScreen</AssemblyName>
+    <RootNamespace>Boxroom_VRScreen</RootNamespace>
+    <AssemblyVersion>0.3.34.0</AssemblyVersion>
+    <FileVersion>0.3.34.0</FileVersion>
+    <Version>0.3.34</Version>
+    <DeployToGame Condition="'$(DeployToGame)' == ''">false</DeployToGame>
+    <VlcUnityRepo Condition="'$(VlcUnityRepo)' == ''">$(MSBuildProjectDirectory)\..\vlc-unity</VlcUnityRepo>
+    <VcMSBuild Condition="'$(VcMSBuild)' == ''">C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\MSBuild\Current\Bin\MSBuild.exe</VcMSBuild>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Remove="Host\**\*.cs" />
+    <Compile Remove="Baselines\**\*.cs" />
+    <Reference Include="Assembly-CSharp"><HintPath>$(GamePath)\BOXROOM_Data\Managed\Assembly-CSharp.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="UnityEngine"><HintPath>$(GamePath)\BOXROOM_Data\Managed\UnityEngine.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="UnityEngine.CoreModule"><HintPath>$(GamePath)\BOXROOM_Data\Managed\UnityEngine.CoreModule.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="UnityEngine.InputLegacyModule"><HintPath>$(GamePath)\BOXROOM_Data\Managed\UnityEngine.InputLegacyModule.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="UnityEngine.PhysicsModule"><HintPath>$(GamePath)\BOXROOM_Data\Managed\UnityEngine.PhysicsModule.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="UnityEngine.UI"><HintPath>$(GamePath)\BOXROOM_Data\Managed\UnityEngine.UI.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="Unity.InputSystem"><HintPath>$(GamePath)\BOXROOM_Data\Managed\Unity.InputSystem.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="MelonLoader"><HintPath>$(GamePath)\MelonLoader\net35\MelonLoader.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="0Harmony"><HintPath>$(GamePath)\MelonLoader\net35\0Harmony.dll</HintPath><Private>false</Private></Reference>
+    <ProjectReference Include="..\Boxroom-TV2\Boxroom-TV.csproj" Private="false"
+                      AdditionalProperties="DeployToGame=false;GamePath=$(GamePath)" />
+  </ItemGroup>
+  <Target Name="BuildHost" BeforeTargets="Build">
+    <MSBuild Projects="Host\Boxroom.VRScreen.Host.csproj" Targets="Restore;Build" Properties="Configuration=$(Configuration)" />
+    <Exec Command="&quot;$(VcMSBuild)&quot; &quot;$(MSBuildProjectDirectory)\Native\VRScreenCapture.vcxproj&quot; /p:Configuration=Release /p:Platform=x64 /p:VlcUnityRepo=&quot;$(VlcUnityRepo)&quot; /m" />
+  </Target>
+  <Target Name="ValidateGamePath" BeforeTargets="ResolveReferences" Condition="!Exists('$(GamePath)\BOXROOM.exe')">
+    <Error Text="GamePath must point to the BOXROOM installation." />
+  </Target>
+  <Target Name="DeployMod" AfterTargets="Build" Condition="'$(DeployToGame)' == 'true'">
+    <MakeDir Directories="$(GamePath)\Mods;$(GamePath)\UserData\Boxroom-VRScreen\Host" />
+    <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(GamePath)\Mods" SkipUnchangedFiles="true" />
+    <Copy SourceFiles="Host\bin\$(Configuration)\net48\Boxroom.VRScreen.Host.exe;Host\bin\$(Configuration)\net48\Boxroom.VRScreen.Host.exe.config" DestinationFolder="$(GamePath)\UserData\Boxroom-VRScreen\Host" SkipUnchangedFiles="true" />
+    <MakeDir Directories="$(GamePath)\BOXROOM_Data\Plugins\x86_64" />
+    <Copy SourceFiles="Native\bin\x64\Release\VRScreenCapture.dll" DestinationFolder="$(GamePath)\BOXROOM_Data\Plugins\x86_64" SkipUnchangedFiles="true" />
+  </Target>
+</Project>
