@@ -17,7 +17,7 @@ using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.UI;
 
-[assembly: MelonInfo(typeof(Boxroom_VRScreen.Core), "Boxroom-VRScreen", "0.3.35", "MidgetBrony")]
+[assembly: MelonInfo(typeof(Boxroom_VRScreen.Core), "Boxroom-VRScreen", "0.3.36", "MidgetBrony")]
 [assembly: MelonGame("NestedLoop", "BOXROOM")]
 [assembly: MelonAdditionalDependencies("Boxroom_TV")]
 

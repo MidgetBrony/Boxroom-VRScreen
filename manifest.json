@@ -10,7 +10,7 @@
   "dependencies": [
     {
       "manifest": "https://raw.githubusercontent.com/MidgetBrony/Boxroom-TV/refs/heads/main/manifest.json",
-      "minimumVersion": "4.0.2-beta.1",
+      "minimumVersion": "4.0.5",
       "required": true
     }
   ],
