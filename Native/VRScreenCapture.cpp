@@ -80,10 +80,17 @@ static bool SetupCapture(HWND hwnd)
 
         D3D11_TEXTURE2D_DESC desc{};
         desc.Width = static_cast<UINT>(g_width); desc.Height = static_cast<UINT>(g_height);
-        desc.MipLevels = 1; desc.ArraySize = 1; desc.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
+        // Windows Graphics Capture supplies display-encoded BGRA values. Keep
+        // the shared resource typeless so it can receive the capture surface,
+        // then expose an sRGB view so Unity decodes those values correctly.
+        desc.MipLevels = 1; desc.ArraySize = 1; desc.Format = DXGI_FORMAT_B8G8R8A8_TYPELESS;
         desc.SampleDesc.Count = 1; desc.Usage = D3D11_USAGE_DEFAULT; desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
         winrt::check_hresult(g_device->CreateTexture2D(&desc, nullptr, &g_texture));
-        winrt::check_hresult(g_device->CreateShaderResourceView(g_texture, nullptr, &g_view));
+        D3D11_SHADER_RESOURCE_VIEW_DESC viewDesc{};
+        viewDesc.Format = DXGI_FORMAT_B8G8R8A8_UNORM_SRGB;
+        viewDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
+        viewDesc.Texture2D.MipLevels = 1;
+        winrt::check_hresult(g_device->CreateShaderResourceView(g_texture, &viewDesc, &g_view));
 
         g_pool = wgc::Direct3D11CaptureFramePool::CreateFreeThreaded(g_winrtDevice, wgd::DirectXPixelFormat::B8G8R8A8UIntNormalized, 2, size);
         g_session = g_pool.CreateCaptureSession(g_item);
@@ -93,7 +100,12 @@ static bool SetupCapture(HWND hwnd)
             try
             {
                 auto frame = sender.TryGetNextFrame();
-                std::lock_guard<std::mutex> lock(g_mutex);
+                // Never queue behind render-thread teardown. Closing a game can
+                // synchronously close the frame pool while this callback is in
+                // flight; waiting for the same mutex there can deadlock the next
+                // capture launch. Dropping one frame during teardown is harmless.
+                std::unique_lock<std::mutex> lock(g_mutex, std::try_to_lock);
+                if (!lock.owns_lock()) return;
                 g_latestFrame = frame;
             }
             catch (...) { g_status = -20; }
